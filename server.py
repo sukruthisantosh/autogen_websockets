@@ -1,17 +1,16 @@
-import os
-os.environ['OPEN_API_KEY']
-
 from datetime import datetime
+from tempfile import TemporaryDirectory
 
 from websockets.sync.client import connect as ws_connect
 
 import autogen
 from autogen.io.websockets import IOWebsockets
 
+import os
+
 
 def on_connect(iostream: IOWebsockets) -> None:
-    print(f" - on_connect(): Connected to client using IOWebsockets {iostream}",
-          flush=True)
+    print(f" - on_connect(): Connected to client using IOWebsockets {iostream}", flush=True)
 
     print(" - on_connect(): Receiving message from client.", flush=True)
 
@@ -21,20 +20,17 @@ def on_connect(iostream: IOWebsockets) -> None:
     # 2. Instantiate ConversableAgent
     agent = autogen.ConversableAgent(
         name="chatbot",
-        system_message="Complete a task given to you and reply TERMINATE when the task is done. If asked about the weather, use tool 'weather_forecast(city)' to get the weather forecast for a city.",
-        llm_config={"config_list": [
-            {"model": "gpt-4o-mini", "temperature": 1,
-             "api_key": os.environ.get('OPEN_API_KEY')}]},
+        system_message="Complete a task given to you. If asked about the weather, use tool 'weather_forecast(city)' to get the weather forecast for a city.",
+        llm_config={"config_list": [{"model": "gpt-4o-mini", "temperature": 0,
+                                     "api_key": os.environ.get('OPEN_API_KEY')}]},
     )
 
     # 3. Define UserProxyAgent
     user_proxy = autogen.UserProxyAgent(
         name="user_proxy",
         system_message="A proxy for the user.",
-        is_termination_msg=lambda x: x.get("content", "") and x.get("content",
-                                                                    "").rstrip().endswith(
-            "TERMINATE"),
-        human_input_mode="NEVER",
+        is_termination_msg=lambda x: x.get("content", "") and x.get("content", "").rstrip().endswith("TERMINATE"),
+        human_input_mode="ALWAYS",
         max_consecutive_auto_reply=10,
         code_execution_config=False,
     )
@@ -44,8 +40,7 @@ def on_connect(iostream: IOWebsockets) -> None:
         return f"The weather forecast for {city} at {datetime.now()} is sunny."
 
     autogen.register_function(
-        weather_forecast, caller=agent, executor=user_proxy,
-        description="Weather forecast for a city"
+        weather_forecast, caller=agent, executor=user_proxy, description="Weather forecast for a city"
     )
 
     # 5. Initiate conversation
@@ -57,30 +52,3 @@ def on_connect(iostream: IOWebsockets) -> None:
         agent,
         message=initial_msg,
     )
-
-
-with IOWebsockets.run_server_in_thread(on_connect=on_connect, port=8765) as uri:
-    print(f" - test_setup() with websocket server running on {uri}.",
-          flush=True)
-
-    with ws_connect(uri) as websocket:
-        print(f" - Connected to server on {uri}", flush=True)
-
-        print(" - Sending message to server.", flush=True)
-        # websocket.send("2+2=?")
-        websocket.send(
-            "Check out the weather in Paris and write a poem about it.")
-
-        while True:
-            message = websocket.recv()
-            message = message.decode("utf-8") if isinstance(message,
-                                                            bytes) else message
-
-            print(message, end="", flush=True)
-
-            if "TERMINATE" in message:
-                print()
-                print(" - Received TERMINATE message. Exiting.", flush=True)
-                break
-            else:
-                print("messages is not TERMINATE... will continue.")
