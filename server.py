@@ -2,7 +2,6 @@ import os
 os.environ['OPEN_API_KEY']
 
 from datetime import datetime
-from tempfile import TemporaryDirectory
 
 from websockets.sync.client import connect as ws_connect
 
@@ -83,3 +82,5 @@ with IOWebsockets.run_server_in_thread(on_connect=on_connect, port=8765) as uri:
                 print()
                 print(" - Received TERMINATE message. Exiting.", flush=True)
                 break
+            else:
+                print("messages is not TERMINATE... will continue.")
